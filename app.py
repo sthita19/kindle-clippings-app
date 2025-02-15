@@ -87,6 +87,47 @@ def load_user(user_id):
     return None
 
 # --------------------------
+# Clippings Parsing Helpers
+# --------------------------
+def read_clippings_from_file(file_path, encoding="utf-8"):
+    with open(file_path, 'r', encoding=encoding) as f:
+        return f.read().split("==========\n")
+
+def separate_clipping(clipping):
+    # Split into non-empty lines
+    lines = [line.strip() for line in clipping.strip().split("\n") if line.strip()]
+    if len(lines) < 2:
+        return ""
+    book_details = lines[0]
+    highlight_text = lines[-1]  # Use the last non-empty line as the highlight text
+    return (
+        f"<div style='margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid #ddd;'>"
+        f"<strong style='font-size:18px; color:#333;'>{book_details}</strong><br/><br/>"
+        f"<em style='font-size:16px; color:#555;'>&ldquo;{highlight_text}&rdquo;</em>"
+        f"</div>"
+    )
+
+def generate_email_content(user_id, num_clippings=5):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT file_path FROM clippings WHERE user_id = ?", (user_id,))
+    files = c.fetchall()
+    conn.close()
+    content_parts = []
+    for file_tuple in files:
+        file_path = file_tuple[0]
+        try:
+            clippings = read_clippings_from_file(file_path)
+            clippings = [clip for clip in clippings if clip.strip()]
+            if clippings:
+                selected = random.sample(clippings, min(num_clippings, len(clippings)))
+                formatted = "".join([separate_clipping(clip) for clip in selected])
+                content_parts.append(formatted)
+        except Exception as e:
+            content_parts.append(f"<p>Error reading {file_path}: {e}</p>")
+    return "<br>".join(content_parts) if content_parts else "<p>No clippings uploaded.</p>"
+
+# --------------------------
 # Email Sending Function (smtplib)
 # --------------------------
 def send_email_to_user(user, email_body):
@@ -107,27 +148,6 @@ def send_email_to_user(user, email_body):
         print(f"Error sending email to {user.email}: {e}")
         return False
 
-# Helper: Generate email content from user clippings
-def generate_email_content(user_id):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id = ?", (user_id,))
-    files = c.fetchall()
-    conn.close()
-    content_parts = []
-    for file_tuple in files:
-        file_path = file_tuple[0]
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                text = f.read()
-                # For production, you might extract highlights instead of full text
-                content_parts.append(f"<pre class='whitespace-pre-wrap bg-gray-100 p-4 rounded'>{text}</pre>")
-        except Exception as e:
-            content_parts.append(f"<p>Error reading {file_path}: {e}</p>")
-    if not content_parts:
-        return "<p>No clippings uploaded.</p>"
-    return "<br>".join(content_parts)
-
 # --------------------------
 # APScheduler: Scheduled Email Sending
 # --------------------------
@@ -140,31 +160,31 @@ def scheduled_email_job():
     now = datetime.datetime.now()
     for u in users:
         user = User(u[0], u[1], u[2], u[3])
-        send_email = False
+        send_email_flag = False
         if user.frequency == 'daily':
             if user.last_sent:
                 last = datetime.datetime.fromisoformat(user.last_sent)
                 if last.date() < now.date():
-                    send_email = True
+                    send_email_flag = True
             else:
-                send_email = True
+                send_email_flag = True
         elif user.frequency == 'weekly':
             if now.weekday() == 0:  # Monday
                 if user.last_sent:
                     last = datetime.datetime.fromisoformat(user.last_sent)
                     if last.isocalendar()[1] < now.isocalendar()[1]:
-                        send_email = True
+                        send_email_flag = True
                 else:
-                    send_email = True
+                    send_email_flag = True
         elif user.frequency == 'monthly':
             if now.day == 1:
                 if user.last_sent:
                     last = datetime.datetime.fromisoformat(user.last_sent)
                     if last.month < now.month or last.year < now.year:
-                        send_email = True
+                        send_email_flag = True
                 else:
-                    send_email = True
-        if send_email:
+                    send_email_flag = True
+        if send_email_flag:
             content = generate_email_content(user.id)
             if send_email_to_user(user, content):
                 conn = sqlite3.connect('users.db')
@@ -246,7 +266,9 @@ def signup():
             </div>
             <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Sign Up</button>
           </form>
-          <p class="text-center mt-3 text-gray-500"><a href="/login" class="text-blue-600 hover:underline">Already have an account? Login</a></p>
+          <p class="text-center mt-3 text-gray-500">
+            <a href="/login" class="text-blue-600 hover:underline">Already have an account? Login</a>
+          </p>
         </div>
       </body>
     </html>
@@ -283,7 +305,9 @@ def login():
             <input type="password" name="password" placeholder="Password" required class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300">
             <button type="submit" class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Login</button>
           </form>
-          <p class="text-center mt-3 text-gray-500"><a href="/signup" class="text-blue-600 hover:underline">Don't have an account? Signup</a></p>
+          <p class="text-center mt-3 text-gray-500">
+            <a href="/signup" class="text-blue-600 hover:underline">Don't have an account? Signup</a>
+          </p>
         </div>
       </body>
     </html>
@@ -321,7 +345,7 @@ def dashboard():
               <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Upload Clippings</button>
             </form>
           </div>
-          <div class="mt-6 flex space-x-4">
+          <div class="mt-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
             <form action="/update_frequency" method="post" class="flex items-center space-x-2">
               <label class="font-semibold">Frequency:</label>
               <select name="frequency" class="px-2 py-1 border rounded">
@@ -331,8 +355,10 @@ def dashboard():
               </select>
               <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update</button>
             </form>
-            <form action="/send-now" method="post">
-              <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Send Clippings Now</button>
+            <form action="/send-now" method="post" class="flex items-center space-x-2 mt-4 sm:mt-0">
+              <label class="font-semibold"># of Clippings:</label>
+              <input type="number" name="num_clippings" value="5" min="1" class="w-20 px-2 py-1 border rounded">
+              <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Send Now</button>
             </form>
           </div>
           <div class="mt-6">
@@ -382,7 +408,11 @@ def view_file(filename):
 @app.route('/send-now', methods=['POST'])
 @login_required
 def send_now():
-    email_content = generate_email_content(current_user.id)
+    try:
+        num = int(request.form.get('num_clippings', 5))
+    except ValueError:
+        num = 5
+    email_content = generate_email_content(current_user.id, num_clippings=num)
     if send_email_to_user(current_user, email_content):
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
@@ -394,8 +424,8 @@ def send_now():
         flash("Failed to send email. Please try again later.", "danger")
     return redirect(url_for('dashboard'))
 
-# Helper: Generate Email Content from Clippings
-def generate_email_content(user_id):
+# Helper: Generate Email Content from Clippings (with limit)
+def generate_email_content(user_id, num_clippings=5):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute("SELECT file_path FROM clippings WHERE user_id = ?", (user_id,))
@@ -405,12 +435,34 @@ def generate_email_content(user_id):
     for file_tuple in files:
         file_path = file_tuple[0]
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                text = f.read()
-                content_parts.append(f"<pre class='whitespace-pre-wrap bg-gray-100 p-4 rounded'>{text}</pre>")
+            clippings = read_clippings_from_file(file_path)
+            clippings = [clip for clip in clippings if clip.strip()]
+            if clippings:
+                selected = random.sample(clippings, min(num_clippings, len(clippings)))
+                formatted = "".join([separate_clipping(clip) for clip in selected])
+                content_parts.append(formatted)
         except Exception as e:
             content_parts.append(f"<p>Error reading {file_path}: {e}</p>")
     return "<br>".join(content_parts) if content_parts else "<p>No clippings uploaded.</p>"
+
+# Helper: Read clippings from a file using separator
+def read_clippings_from_file(file_path, encoding="utf-8"):
+    with open(file_path, 'r', encoding=encoding) as f:
+        return f.read().split("==========\n")
+
+# Helper: Format a single clipping into HTML
+def separate_clipping(clipping):
+    lines = [line.strip() for line in clipping.strip().split("\n") if line.strip()]
+    if len(lines) < 2:
+        return ""
+    book_details = lines[0]
+    highlight_text = lines[-1]  # Use the last non-empty line as the highlight text
+    return (
+        f"<div style='margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid #ddd;'>"
+        f"<h3 style='margin:0; font-size:18px; color:#333;'>{book_details}</h3>"
+        f"<p style='margin:5px 0 0; font-size:16px; font-style:italic; color:#555;'>&ldquo;{highlight_text}&rdquo;</p>"
+        f"</div>"
+    )
 
 # Logout Route
 @app.route('/logout')
