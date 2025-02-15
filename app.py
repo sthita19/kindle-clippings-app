@@ -32,9 +32,11 @@ init_db()
 
 # Flask-Login User Model
 class User(UserMixin):
-    def __init__(self, id, email):
+    def __init__(self, id, email, password=None):  # Allow password to be optional
         self.id = id
         self.email = email
+        self.password = password
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -46,6 +48,9 @@ def load_user(user_id):
     if user:
         return User(*user)
     return None
+@app.route('/')
+def home():
+    return "<h1>Welcome to Kindle Clippings App</h1>"
 
 # Signup Route
 @app.route('/signup', methods=['GET', 'POST'])
