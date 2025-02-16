@@ -153,11 +153,12 @@ def separate_clipping(clipping):
     book_title = lines[0]
     highlight_text = lines[-1]
     return (
-        "<div style='margin-bottom:20px; border-bottom:1px solid #ccc; padding-bottom:10px;'>"
-        f"<h3 style='margin:0; font-size:18px; color:#333;'>{book_title}</h3>"
-        f"<p style='margin:5px 0 0; font-size:16px; font-style:italic;'>&ldquo;{highlight_text}&rdquo;</p>"
+        "<div class='mb-5 border-b border-gray-300 pb-2'>"
+        f"<h3 class='text-lg font-semibold text-gray-800 dark:text-gray-200'>{book_title}</h3>"
+        f"<p class='mt-1 text-base italic text-gray-600 dark:text-gray-400'>&ldquo;{highlight_text}&rdquo;</p>"
         "</div>"
     )
+
 
 def generate_email_content(user_id, num_clippings=5):
     conn = sqlite3.connect('users.db')
@@ -274,6 +275,7 @@ def scheduled_email_job():
     now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
     now_ist = now_utc.astimezone(IST)
     current_time = now_ist.strftime("%H:%M")
+    print(f"[Scheduler] Current IST time: {current_time}")
 
     for row in rows:
         user_obj = User(*row)

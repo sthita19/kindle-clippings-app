@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-white p-8 rounded-xl shadow-2xl">
+<div class="bg-[#D1F8EF] p-8 rounded-xl shadow-2xl transition-all duration-300">
     <h2 class="text-4xl font-bold text-gray-800">Browse Your Clippings</h2>
     <form method="GET" action="{{ url_for('browse') }}" class="mt-6 flex items-center space-x-4">
         <input type="text" name="query" value="{{ request.args.get('query', '') }}" placeholder="Search by book title"
-            class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300">
-        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 shadow-lg">
+            class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 transition-all duration-300">
+        <button type="submit"
+            class="px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 shadow-lg transition-all duration-300">
             Search
         </button>
     </form>
@@ -15,7 +16,7 @@
         {% if grouped_books %}
         {% for book_title, snippets in grouped_books.items() %}
         <div onclick="openModal('{{ book_title }}')"
-            class="cursor-pointer bg-white border rounded-lg shadow p-4 hover:shadow-xl transition">
+            class="cursor-pointer bg-white border rounded-lg shadow p-4 hover:shadow-xl transition transform hover:scale-105">
             <h3 class="text-lg font-semibold text-[#3674B5]">{{ book_title }}</h3>
         </div>
         {% endfor %}
@@ -25,19 +26,22 @@
     </div>
 
     <div class="mt-8">
-        <a href="{{ url_for('dashboard') }}" class="text-blue-600 underline">Back to Dashboard</a>
+        <a href="{{ url_for('dashboard') }}" class="text-blue-600 underline transition-all duration-300">Back to
+            Dashboard</a>
     </div>
 </div>
 
 <!-- Modal for Displaying Clippings -->
-<div id="modal" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden">
-    <div id="modalContentContainer" class="bg-white rounded-lg shadow-lg p-6 w-11/12 md:w-2/3 lg:w-1/2 relative">
+<div id="modal"
+    class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden transition-opacity duration-300">
+    <div id="modalContentContainer"
+        class="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-11/12 md:w-2/3 lg:w-1/2 relative transition-all duration-300">
         <div class="flex justify-between items-center">
-            <h2 id="modalTitle" class="text-2xl font-bold text-gray-800"></h2>
+            <h2 id="modalTitle" class="text-2xl font-bold text-gray-800 dark:text-gray-200"></h2>
             <button onclick="closeModal()"
-                class="text-gray-600 text-3xl leading-none absolute top-2 right-2">&times;</button>
+                class="text-gray-600 dark:text-gray-300 text-3xl leading-none absolute top-2 right-2">&times;</button>
         </div>
-        <div id="modalContent" class="mt-4 max-h-80 overflow-y-auto space-y-4 text-gray-700">
+        <div id="modalContent" class="mt-4 max-h-80 overflow-y-auto space-y-4 text-gray-700 dark:text-gray-300">
             <!-- Clippings for the selected book will be injected here -->
         </div>
     </div>
@@ -65,7 +69,6 @@
 
     // Close modal when clicking outside the modal content
     document.getElementById('modal').addEventListener('click', function (e) {
-        // If the clicked element is the overlay itself, close the modal
         if (e.target === this) {
             closeModal();
         }

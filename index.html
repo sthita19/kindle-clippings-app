@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" class="transition-colors duration-300">
+
+<head>
+    <title>Dark Mode Test</title>
+    <script>
+        // Set dark mode configuration before loading Tailwind
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-white dark:bg-black text-black dark:text-white transition-colors duration-300">
+    <div class="p-4 text-center">
+        <p>This text should be black on a white background in light mode, and white on a black background in dark mode.
+        </p>
+        <button id="theme-toggle" class="mt-4 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded">Toggle Dark Mode</button>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggleButton = document.getElementById('theme-toggle');
+            toggleButton.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                if (document.documentElement.classList.contains('dark')) {
+                    localStorage.setItem('theme', 'dark');
+                    console.log("Dark mode activated");
+                } else {
+                    localStorage.setItem('theme', 'light');
+                    console.log("Light mode activated");
+                }
+            });
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+                console.log("Applied saved dark mode");
+            }
+        });
+    </script>
+</body>
+
+</html>

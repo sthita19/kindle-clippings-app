@@ -1,27 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="transition-colors duration-300">
 
 <head>
     <title>Kindle Clippings - Base Layout</title>
+    <script>
+        // Configure Tailwind dark mode before loading the CDN
+        tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gradient-to-r from-[#3674B5] to-[#A1E3F9] min-h-screen">
+<body
+    class="bg-gradient-to-r from-[#3674B5] to-[#A1E3F9] dark:from-gray-900 dark:to-gray-800 min-h-screen transition-colors duration-300">
     <!-- Navbar -->
-    <nav class="bg-white shadow p-4">
+    <nav class="bg-white dark:bg-gray-800 shadow p-4 transition-colors duration-300">
         <div class="container mx-auto flex justify-between items-center">
-            <div class="text-xl font-bold text-[#3674B5]">
+            <div class="text-xl font-bold text-[#3674B5] dark:text-indigo-400">
                 <a href="{{ url_for('home') }}">Kindle Clippings</a>
             </div>
             <div class="space-x-4">
-                <a href="{{ url_for('home') }}" class="text-[#3674B5] hover:text-[#578FCA]">Home</a>
+                <a href="{{ url_for('home') }}"
+                    class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Home</a>
                 {% if current_user.is_authenticated %}
-                <a href="{{ url_for('dashboard') }}" class="text-[#3674B5] hover:text-[#578FCA]">Dashboard</a>
-                <a href="{{ url_for('browse') }}" class="text-[#3674B5] hover:text-[#578FCA]">Browse</a>
-                <a href="{{ url_for('logout') }}" class="text-[#3674B5] hover:text-[#578FCA]">Logout</a>
+                <a href="{{ url_for('dashboard') }}"
+                    class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Dashboard</a>
+                <a href="{{ url_for('browse') }}"
+                    class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Browse</a>
+                <a href="{{ url_for('logout') }}"
+                    class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Logout</a>
                 {% else %}
-                <a href="{{ url_for('login') }}" class="text-[#3674B5] hover:text-[#578FCA]">Login</a>
-                <a href="{{ url_for('signup') }}" class="text-[#3674B5] hover:text-[#578FCA]">Sign Up</a>
+                <a href="{{ url_for('login') }}"
+                    class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Login</a>
+                <a href="{{ url_for('signup') }}" class="text-[#3674B5] dark:text-indigo-400 hover:text-[#578FCA]">Sign
+                    Up</a>
                 {% endif %}
             </div>
         </div>
@@ -34,9 +45,9 @@
         <div class="mb-4">
             {% for category, message in messages %}
             <div class="px-4 py-2 rounded mb-2
-                {% if category == 'success' %}bg-green-200 text-green-800
-                {% elif category == 'danger' %}bg-red-200 text-red-800
-                {% else %}bg-blue-200 text-blue-800{% endif %}">
+                            {% if category == 'success' %}bg-green-200 text-green-800
+                            {% elif category == 'danger' %}bg-red-200 text-red-800
+                            {% else %}bg-blue-200 text-blue-800{% endif %}">
                 {{ message }}
             </div>
             {% endfor %}
@@ -49,6 +60,8 @@
     <div class="container mx-auto px-4 mt-6">
         {% block content %}{% endblock %}
     </div>
+
+
 </body>
 
 </html>
