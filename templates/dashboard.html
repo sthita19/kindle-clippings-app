@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-10 bg-white rounded-xl shadow-2xl">
+    <h2 class="text-4xl font-bold text-gray-800">Welcome, {{ current_user.email }}!</h2>
+
+    <div class="mt-4 text-gray-800">
+        <p>Current File: <span class="underline text-[#3674B5]">{{ file_display }}</span></p>
+        <p>Total Clippings: {{ total }}</p>
+        <p>Most Highlighted Book: {{ most_highlighted }}</p>
+    </div>
+
+    <div class="mt-8">
+        <a href="{{ url_for('browse') }}"
+            class="px-6 py-3 bg-[#578FCA] text-white rounded-full shadow-lg hover:bg-[#3674B5]">
+            Browse Clippings
+        </a>
+    </div>
+
+    <div class="mt-8">
+        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data"
+            class="flex flex-col sm:flex-row items-center sm:space-x-4">
+            <input type="file" name="file" class="p-2 border rounded mb-4 sm:mb-0">
+            <button type="submit" class="px-6 py-3 bg-[#578FCA] text-white rounded-full shadow-lg hover:bg-[#3674B5]">
+                Overwrite File
+            </button>
+        </form>
+    </div>
+
+    <!-- Frequency Form -->
+    <div class="mt-8">
+        <form action="{{ url_for('update_frequency') }}" method="post" class="flex items-center space-x-2">
+            <label class="font-semibold text-gray-800">Frequency:</label>
+            <select name="frequency" class="px-3 py-2 border rounded-lg focus:ring focus:ring-blue-300">
+                <option value="daily" {% if current_user.frequency=='daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if current_user.frequency=='weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if current_user.frequency=='monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+            <button type="submit" class="px-5 py-2 bg-[#578FCA] text-white rounded-full hover:bg-[#3674B5] shadow-lg">
+                Confirm Frequency
+            </button>
+        </form>
+    </div>
+
+    <!-- Scheduling Form -->
+    <div class="mt-8">
+        <form action="{{ url_for('update_scheduling') }}" method="post"
+            class="flex flex-col sm:flex-row items-center sm:space-x-4">
+            <div class="flex items-center space-x-2">
+                <label class="font-semibold text-gray-800">Send Time:</label>
+                <input type="time" name="send_time" value="{{ current_user.send_time }}"
+                    class="px-3 py-2 border rounded-lg">
+            </div>
+            <div class="flex items-center space-x-2 mt-4 sm:mt-0">
+                <label class="font-semibold text-gray-800">Pause Notifications:</label>
+                <input type="checkbox" name="notifications_paused" {% if current_user.notifications_paused==1
+                    %}checked{% endif %}>
+            </div>
+            <button type="submit"
+                class="mt-4 sm:mt-0 px-5 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 shadow-lg">
+                Update Scheduling
+            </button>
+        </form>
+    </div>
+
+    <!-- Send Now -->
+    <div class="mt-8 flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+        <form action="{{ url_for('send_now') }}" method="post" class="flex items-center space-x-2">
+            <label class="font-semibold text-gray-800"># of Clippings:</label>
+            <input type="number" name="num_clippings" value="5" min="1" class="w-20 px-3 py-2 border rounded-lg">
+            <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 shadow-lg">
+                Send Now
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col items-center justify-center h-[80vh]">
+    <div class="bg-[#D1F8EF] p-10 rounded-xl shadow-2xl text-center">
+        <h1 class="text-5xl font-bold text-gray-800">📖 Kindle Clippings</h1>
+        <p class="mt-4 text-gray-700">Upload your Kindle highlights and receive them by email at your chosen frequency.
+        </p>
+        <div class="mt-8 space-x-6">
+            <a href="{{ url_for('signup') }}"
+                class="px-8 py-3 bg-[#578FCA] text-white rounded-full shadow-lg hover:bg-[#3674B5]">Sign Up</a>
+            <a href="{{ url_for('login') }}"
+                class="px-8 py-3 bg-gray-800 text-white rounded-full shadow-lg hover:bg-gray-900">Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
