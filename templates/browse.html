@@ -9,11 +9,66 @@
             Search
         </button>
     </form>
-    <div class="mt-8">
-        {{ grouped_html|safe }}
+
+    <!-- Grid of Book Tiles -->
+    <div class="mt-8 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {% if grouped_books %}
+        {% for book_title, snippets in grouped_books.items() %}
+        <div onclick="openModal('{{ book_title }}')"
+            class="cursor-pointer bg-white border rounded-lg shadow p-4 hover:shadow-xl transition">
+            <h3 class="text-lg font-semibold text-[#3674B5]">{{ book_title }}</h3>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="col-span-full text-gray-500">No clippings found.</p>
+        {% endif %}
     </div>
+
     <div class="mt-8">
         <a href="{{ url_for('dashboard') }}" class="text-blue-600 underline">Back to Dashboard</a>
     </div>
 </div>
+
+<!-- Modal for Displaying Clippings -->
+<div id="modal" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden">
+    <div id="modalContentContainer" class="bg-white rounded-lg shadow-lg p-6 w-11/12 md:w-2/3 lg:w-1/2 relative">
+        <div class="flex justify-between items-center">
+            <h2 id="modalTitle" class="text-2xl font-bold text-gray-800"></h2>
+            <button onclick="closeModal()"
+                class="text-gray-600 text-3xl leading-none absolute top-2 right-2">&times;</button>
+        </div>
+        <div id="modalContent" class="mt-4 max-h-80 overflow-y-auto space-y-4 text-gray-700">
+            <!-- Clippings for the selected book will be injected here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    var groupedBooks = {{ grouped_books| tojson }};
+
+    function openModal(bookTitle) {
+        console.log("Opening modal for:", bookTitle);
+        document.getElementById('modalTitle').innerText = bookTitle;
+        var contentHtml = "";
+        if (groupedBooks[bookTitle]) {
+            contentHtml = groupedBooks[bookTitle].join("");
+        } else {
+            contentHtml = "<p>No clippings available for this book.</p>";
+        }
+        document.getElementById('modalContent').innerHTML = contentHtml;
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('modal').classList.add('hidden');
+    }
+
+    // Close modal when clicking outside the modal content
+    document.getElementById('modal').addEventListener('click', function (e) {
+        // If the clicked element is the overlay itself, close the modal
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+</script>
 {% endblock %}

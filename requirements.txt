@@ -18,6 +18,7 @@ MarkupSafe==3.0.2
 packaging==24.2
 python-dateutil==2.9.0.post0
 python-http-client==3.3.7
+pytz==2025.1
 s3transfer==0.11.2
 sendgrid==6.11.0
 six==1.17.0

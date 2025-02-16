@@ -16,6 +16,7 @@
         </a>
     </div>
 
+    <!-- Overwrite File Upload -->
     <div class="mt-8">
         <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data"
             class="flex flex-col sm:flex-row items-center sm:space-x-4">
@@ -55,6 +56,12 @@
                 <input type="checkbox" name="notifications_paused" {% if current_user.notifications_paused==1
                     %}checked{% endif %}>
             </div>
+            <!-- Number of Clippings -->
+            <div class="flex items-center space-x-2 mt-4 sm:mt-0">
+                <label class="font-semibold text-gray-800">Clippings per Email:</label>
+                <input type="number" name="num_clippings" value="{{ current_user.num_clippings or 5 }}" min="1"
+                    class="w-20 px-3 py-2 border rounded-lg">
+            </div>
             <button type="submit"
                 class="mt-4 sm:mt-0 px-5 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 shadow-lg">
                 Update Scheduling
@@ -72,5 +79,37 @@
             </button>
         </form>
     </div>
+
+    <!-- Email Send History -->
+    <div class="mt-10">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Email Send History</h2>
+        {% if email_history %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-300 rounded-lg overflow-hidden">
+                <thead class="bg-[#3674B5] text-white">
+                    <tr>
+                        <th class="px-4 py-2 text-left">#</th>
+                        <th class="px-4 py-2 text-left">Sent At (IST)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for timestamp in email_history %}
+                    <tr class="border-b last:border-b-0">
+                        <td class="px-4 py-2 text-[#3674B5] font-semibold">
+                            {{ loop.index }}
+                        </td>
+                        <td class="px-4 py-2 text-gray-700">
+                            {{ timestamp|friendly_time }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-600">No emails sent yet.</p>
+        {% endif %}
+    </div>
+
 </div>
 {% endblock %}
