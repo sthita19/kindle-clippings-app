@@ -4,7 +4,6 @@
 <head>
     <title>Kindle Clippings - Base Layout</title>
     <script>
-        // Configure Tailwind dark mode before loading the CDN
         tailwind.config = { darkMode: 'class', theme: { extend: {} } };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +11,6 @@
 
 <body
     class="bg-gradient-to-r from-[#3674B5] to-[#A1E3F9] dark:from-gray-900 dark:to-gray-800 min-h-screen transition-colors duration-300">
-    <!-- Navbar -->
     <nav class="bg-white dark:bg-gray-800 shadow p-4 transition-colors duration-300">
         <div class="container mx-auto flex justify-between items-center">
             <div class="text-xl font-bold text-[#3674B5] dark:text-indigo-400">
@@ -38,7 +36,6 @@
         </div>
     </nav>
 
-    <!-- Flash messages -->
     <div class="container mx-auto mt-4 px-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -56,7 +53,6 @@
         {% endwith %}
     </div>
 
-    <!-- Main content -->
     <div class="container mx-auto px-4 mt-6">
         {% block content %}{% endblock %}
     </div>
