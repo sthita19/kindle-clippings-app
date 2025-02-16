@@ -11,7 +11,6 @@
         </button>
     </form>
 
-    <!-- Grid of Book Tiles -->
     <div class="mt-8 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {% if grouped_books %}
         {% for book_title, snippets in grouped_books.items() %}
@@ -31,7 +30,6 @@
     </div>
 </div>
 
-<!-- Modal for Displaying Clippings -->
 <div id="modal"
     class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden transition-opacity duration-300">
     <div id="modalContentContainer"
@@ -42,7 +40,6 @@
                 class="text-gray-600 dark:text-gray-300 text-3xl leading-none absolute top-2 right-2">&times;</button>
         </div>
         <div id="modalContent" class="mt-4 max-h-80 overflow-y-auto space-y-4 text-gray-700 dark:text-gray-300">
-            <!-- Clippings for the selected book will be injected here -->
         </div>
     </div>
 </div>
@@ -67,7 +64,6 @@
         document.getElementById('modal').classList.add('hidden');
     }
 
-    // Close modal when clicking outside the modal content
     document.getElementById('modal').addEventListener('click', function (e) {
         if (e.target === this) {
             closeModal();
