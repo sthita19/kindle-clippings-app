@@ -3,6 +3,8 @@ import sqlite3
 import datetime
 import random
 import smtplib
+import boto3
+import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -18,8 +20,14 @@ bcrypt = Bcrypt(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = "login"  # Our login route function is named "login"
+login_manager.login_view = "login"
 
+# S3 configuration
+AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME", "my-kindle-clippings-app")
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+s3 = boto3.client('s3', region_name=AWS_REGION)
+
+# (Optional) We'll still define an uploads folder for local development fallback
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -33,7 +41,6 @@ SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "app_password")
 def init_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    # Create 'users' table (with advanced scheduling columns)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,12 +52,12 @@ def init_db():
             notifications_paused INTEGER NOT NULL DEFAULT 0
         )
     ''')
-    # One clippings file per user
+    # Instead of storing a local file path, we store the S3 key
     c.execute('''
         CREATE TABLE IF NOT EXISTS clippings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            file_path TEXT NOT NULL,
+            s3_key TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
@@ -83,12 +90,29 @@ def load_user(user_id):
     return None
 
 ##########################
+# AWS S3 File Helpers
+##########################
+def upload_file_to_s3(file_obj, filename, user_id):
+    """
+    Uploads file_obj to S3 under a key using the user_id and filename.
+    Returns the S3 key.
+    """
+    # Create a unique S3 key, for example: "user_{id}/filename"
+    s3_key = f"user_{user_id}/{secure_filename(filename)}"
+    s3.upload_fileobj(file_obj, AWS_BUCKET_NAME, s3_key)
+    return s3_key
+
+
+def read_clippings_from_s3(s3_key):
+    response = s3.get_object(Bucket=AWS_BUCKET_NAME, Key=s3_key)
+    content = response['Body'].read().decode('utf-8-sig')
+    # Use a regex to split on lines that consist solely of '=' (with optional whitespace)
+    clips = re.split(r'\n\s*=+\s*\n', content)
+    return clips
+
+##########################
 # Clippings & Email Helpers
 ##########################
-def read_clippings_from_file(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return f.read().split("==========\n")
-
 def separate_clipping(clipping):
     lines = [line.strip() for line in clipping.strip().split('\n') if line.strip()]
     if len(lines) < 2:
@@ -101,68 +125,25 @@ def separate_clipping(clipping):
         f"<p style='margin:5px 0 0; font-size:16px; font-style:italic;'>&ldquo;{highlight_text}&rdquo;</p>"
         "</div>"
     )
-def get_analytics(user_id):
-    """
-    Returns a tuple: (total_clippings, most_highlighted_book_title)
-    """
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id = ?", (user_id,))
-    row = c.fetchone()
-    conn.close()
-
-    if not row:
-        # User has no clippings file
-        return 0, "N/A"
-
-    file_path = row[0]
-    try:
-        raw_clips = read_clippings_from_file(file_path)  # Your existing helper
-        valid_clips = [clip for clip in raw_clips if clip.strip()]
-        total = len(valid_clips)
-
-        book_counts = {}
-        for clip in valid_clips:
-            lines = [line.strip() for line in clip.split('\n') if line.strip()]
-            if lines:
-                book_title = lines[0]
-                book_counts[book_title] = book_counts.get(book_title, 0) + 1
-
-        if book_counts:
-            most_highlighted = max(book_counts, key=book_counts.get)
-        else:
-            most_highlighted = "N/A"
-
-        return total, most_highlighted
-    except Exception as e:
-        # If there's a read error or no data
-        return 0, f"Error: {e}"
 
 def generate_email_content(user_id, num_clippings=5):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id=?", (user_id,))
+    c.execute("SELECT s3_key FROM clippings WHERE user_id=?", (user_id,))
     row = c.fetchone()
     conn.close()
     if not row:
         return "<p>No clippings uploaded.</p>"
-    file_path = row[0]
-
-    clips = []
+    s3_key = row[0]
     try:
-        raw_data = read_clippings_from_file(file_path)
-        for clip in raw_data:
-            if clip.strip():
-                clips.append(clip)
+        raw_clips = read_clippings_from_s3(s3_key)
+        clips = [clip for clip in raw_clips if clip.strip()]
     except Exception as e:
-        return f"<p>Error reading file: {e}</p>"
-
+        return f"<p>Error reading file from S3: {e}</p>"
     if not clips:
         return "<p>No clippings uploaded.</p>"
-
     selected = random.sample(clips, min(num_clippings, len(clips)))
-    formatted = [separate_clipping(clip) for clip in selected]
-    return "".join(formatted)
+    return "".join(separate_clipping(clip) for clip in selected)
 
 def send_email_to_user(user, email_html):
     try:
@@ -183,23 +164,44 @@ def send_email_to_user(user, email_html):
         return False
 
 ##########################
-# Additional Analytics: Book Distribution
+# Analytics Helper
 ##########################
-def get_book_distribution(user_id):
-    """
-    Returns a dict: { book_title: count_of_clippings, ... }
-    """
+def get_analytics(user_id):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id=?", (user_id,))
+    c.execute("SELECT s3_key FROM clippings WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return 0, "N/A"
+    s3_key = row[0]
+    try:
+        raw_clips = read_clippings_from_s3(s3_key)
+        valid_clips = [clip for clip in raw_clips if clip.strip()]
+        total = len(valid_clips)
+        counts = {}
+        for clip in valid_clips:
+            lines = [ln.strip() for ln in clip.split('\n') if ln.strip()]
+            if lines:
+                book_title = lines[0]
+                counts[book_title] = counts.get(book_title, 0) + 1
+        most_highlighted = max(counts, key=counts.get) if counts else "N/A"
+        return total, most_highlighted
+    except Exception as e:
+        return 0, f"Error: {e}"
+
+def get_book_distribution(user_id):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT s3_key FROM clippings WHERE user_id=?", (user_id,))
     row = c.fetchone()
     conn.close()
     distribution = {}
     if not row:
-        return distribution  # no file => empty
-    path = row[0]
+        return distribution
+    s3_key = row[0]
     try:
-        raw_data = read_clippings_from_file(path)
+        raw_data = read_clippings_from_s3(s3_key)
         for clip in raw_data:
             lines = [ln.strip() for ln in clip.split('\n') if ln.strip()]
             if len(lines) >= 2:
@@ -210,7 +212,7 @@ def get_book_distribution(user_id):
     return distribution
 
 ##########################
-# APScheduler: Advanced Scheduling
+# APScheduler for Advanced Scheduling
 ##########################
 def scheduled_email_job():
     conn = sqlite3.connect('users.db')
@@ -218,18 +220,14 @@ def scheduled_email_job():
     c.execute("SELECT id, email, frequency, last_sent, send_time, notifications_paused FROM users")
     rows = c.fetchall()
     conn.close()
-
     now = datetime.datetime.now()
     current_time = now.strftime("%H:%M")
-
     for row in rows:
         user_obj = User(*row)
-        # skip if paused
         if user_obj.notifications_paused == 1:
             continue
         if current_time != user_obj.send_time:
             continue
-
         send_flag = False
         if user_obj.frequency == 'daily':
             if user_obj.last_sent:
@@ -239,7 +237,6 @@ def scheduled_email_job():
             else:
                 send_flag = True
         elif user_obj.frequency == 'weekly':
-            # Monday check
             if now.weekday() == 0:
                 if user_obj.last_sent:
                     last_dt = datetime.datetime.fromisoformat(user_obj.last_sent)
@@ -255,7 +252,6 @@ def scheduled_email_job():
                         send_flag = True
                 else:
                     send_flag = True
-
         if send_flag:
             content = generate_email_content(user_obj.id)
             if send_email_to_user(user_obj, content):
@@ -283,7 +279,6 @@ def signup():
         email = request.form["email"]
         password = request.form["password"]
         freq = request.form.get("frequency", "daily")
-
         conn = sqlite3.connect("users.db")
         c = conn.cursor()
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
@@ -303,14 +298,12 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-
         conn = sqlite3.connect("users.db")
         c = conn.cursor()
         c.execute("""SELECT id, email, password, frequency, last_sent, send_time, notifications_paused
                      FROM users WHERE email=?""", (email,))
         row = c.fetchone()
         conn.close()
-
         if row is None:
             flash("Account does not exist. Please sign up.", "danger")
         else:
@@ -326,27 +319,21 @@ def login():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    # Check if user has an uploaded file
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id=?", (current_user.id,))
+    c.execute("SELECT s3_key FROM clippings WHERE user_id=?", (current_user.id,))
     row = c.fetchone()
     conn.close()
-
     if row:
-        file_name = os.path.basename(row[0])
+        file_name = row[0].split("/")[-1]
         total, most_book = get_analytics(current_user.id)
         file_display = file_name
     else:
         file_display = "No clippings file uploaded yet."
         total, most_book = 0, "N/A"
-
-    # For the pie chart: distribution of clippings by book
     distribution = get_book_distribution(current_user.id)
-    # We'll pass the book titles and counts as lists to feed Chart.js
     labels = list(distribution.keys())
     counts = list(distribution.values())
-
     return render_template("dashboard.html",
                            file_display=file_display,
                            total=total,
@@ -358,19 +345,17 @@ def dashboard():
 @login_required
 def browse():
     query = request.args.get("query", "").strip().lower()
-
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    c.execute("SELECT file_path FROM clippings WHERE user_id=?", (current_user.id,))
+    c.execute("SELECT s3_key FROM clippings WHERE user_id=?", (current_user.id,))
     row = c.fetchone()
     conn.close()
-
     grouped_html = ""
     if row:
-        path = row[0]
+        key = row[0]
         books = {}
         try:
-            raw_clips = read_clippings_from_file(path)
+            raw_clips = read_clippings_from_s3(key)
             for clip in raw_clips:
                 lines = [ln.strip() for ln in clip.split('\n') if ln.strip()]
                 if len(lines) < 2:
@@ -378,12 +363,10 @@ def browse():
                 book_title = lines[0]
                 if query and query not in book_title.lower():
                     continue
-                snippet = separate_clipping(clip)
-                books.setdefault(book_title, []).append(snippet)
+                books.setdefault(book_title, []).append(separate_clipping(clip))
         except Exception as e:
             grouped_html = f"<p>Error reading file: {e}</p>"
             books = {}
-
         if books:
             grouped_html = ""
             for bk, parts in books.items():
@@ -392,11 +375,9 @@ def browse():
             if not grouped_html:
                 grouped_html = "<p>No matching clippings found.</p>"
         else:
-            if not grouped_html:
-                grouped_html = "<p>No clippings found in this file.</p>"
+            grouped_html = "<p>No clippings found in this file.</p>"
     else:
         grouped_html = "<p>No file uploaded yet.</p>"
-
     return render_template("browse.html", grouped_html=grouped_html)
 
 @app.route("/update_scheduling", methods=["POST"])
@@ -404,14 +385,11 @@ def browse():
 def update_scheduling():
     stime = request.form.get("send_time", "09:00")
     paused = 1 if request.form.get("notifications_paused") == "on" else 0
-
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET send_time=?, notifications_paused=? WHERE id=?",
-              (stime, paused, current_user.id))
+    c.execute("UPDATE users SET send_time=?, notifications_paused=? WHERE id=?", (stime, paused, current_user.id))
     conn.commit()
     conn.close()
-
     flash("Scheduling options updated successfully.", "success")
     return redirect(url_for("dashboard"))
 
@@ -419,13 +397,11 @@ def update_scheduling():
 @login_required
 def update_frequency():
     freq = request.form.get("frequency", "daily")
-
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET frequency=? WHERE id=?", (freq, current_user.id))
     conn.commit()
     conn.close()
-
     flash("Frequency updated successfully.", "success")
     return redirect(url_for("dashboard"))
 
@@ -435,17 +411,15 @@ def upload_file():
     f = request.files.get("file")
     if f:
         fname = secure_filename(f.filename)
-        path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
-        f.save(path)
-
+        # Upload to S3 instead of local storage
+        s3_key = upload_file_to_s3(f, fname, current_user.id)
         conn = sqlite3.connect("users.db")
         c = conn.cursor()
         c.execute("DELETE FROM clippings WHERE user_id=?", (current_user.id,))
-        c.execute("INSERT INTO clippings (user_id, file_path) VALUES (?, ?)", (current_user.id, path))
+        c.execute("INSERT INTO clippings (user_id, s3_key) VALUES (?, ?)", (current_user.id, s3_key))
         conn.commit()
         conn.close()
-
-        flash("File uploaded & overwritten successfully!", "success")
+        flash("File uploaded & stored successfully!", "success")
     return redirect(url_for("dashboard"))
 
 @app.route("/send-now", methods=["POST"])
@@ -476,6 +450,7 @@ def logout():
 @app.route("/view/<path:filename>")
 @login_required
 def view_file(filename):
+    # For local testing, you can still view files if needed (not S3)
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 if __name__ == "__main__":
