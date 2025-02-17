@@ -288,7 +288,7 @@ def scheduled_email_job():
         if user_obj.frequency == 'daily':
             # (Optional) Prevent double sending if less than 60 seconds have passed
             if user_obj.last_sent:
-                last_dt = datetime.datetime.fromisoformat(user_obj.last_sent)
+                last_dt =datetime.fromisoformat(user_obj.last_sent)
                 # let's say 30 minutes lockout to avoid duplicates too soon
                 if (now_ist - last_dt).total_seconds() < 1800:
                     # skip if last_sent was within 30 minutes
